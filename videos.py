@@ -178,10 +178,7 @@ def main(path : str = "videos/datasets/example.in") :
         )
 
         m.addConstrs(
-            (P[r] == Ld[Re[r]] 
-            - gp.quicksum((Ld[Re[r]] - Lc[Re[r]][C_id[Re[r]].index(c)]) * Z[r, c] for c in C_id[Re[r]])
-            - Ld[Re[r]] * U[r]
-            for r in range(R)),
+            (P[r] == Ld[Re[r]]- (Ld[Re[r]] * U[r] + gp.quicksum(Lc[Re[r]][C_id[Re[r]].index(c)] * Z[r, c]for c in C_id[Re[r]]))for r in range(R)),
             name="Pr"
         )
 
@@ -228,4 +225,4 @@ if __name__ == "__main__":                                                      
     main(args)                                                                                                                                              #
 # ========================================================================================================================================================= #
 
-# Fait main, avec l'aide occationnel du chatbot de Gurobi pour certaines contraintes, ainsi que pour le passage sous forme matricielle
+# Fait main, avec l'aide occationnel du chatbot de Gurobi pour certaines contraintes, ainsi que pour le passage sous forme matricielle;
