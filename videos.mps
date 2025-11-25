@@ -79,36 +79,6 @@ COLUMNS
     Yij[4,2]  Capacity[2]  110
     Yij[4,2]  VideoMustBeInCache[2,2]  -1
     Yij[4,2]  ValidVideoCache[4,2]  1
-    Zrc[0,0]  ServeRequest[0]  1
-    Zrc[0,0]  VideoMustBeInCache[0,0]  1
-    Zrc[0,0]  Pr[0]     900
-    Zrc[0,1]  ServeRequest[0]  1
-    Zrc[0,1]  VideoMustBeInCache[0,1]  1
-    Zrc[0,1]  Pr[0]     700
-    Zrc[0,2]  ServeRequest[0]  1
-    Zrc[0,2]  VideoMustBeInCache[0,2]  1
-    Zrc[0,2]  Pr[0]     800
-    Zrc[1,0]  OBJ       0
-    Zrc[1,1]  OBJ       0
-    Zrc[1,2]  OBJ       0
-    Zrc[2,0]  ServeRequest[2]  1
-    Zrc[2,0]  VideoMustBeInCache[2,0]  1
-    Zrc[2,0]  Pr[2]     900
-    Zrc[2,1]  ServeRequest[2]  1
-    Zrc[2,1]  VideoMustBeInCache[2,1]  1
-    Zrc[2,1]  Pr[2]     700
-    Zrc[2,2]  ServeRequest[2]  1
-    Zrc[2,2]  VideoMustBeInCache[2,2]  1
-    Zrc[2,2]  Pr[2]     800
-    Zrc[3,0]  ServeRequest[3]  1
-    Zrc[3,0]  VideoMustBeInCache[3,0]  1
-    Zrc[3,0]  Pr[3]     900
-    Zrc[3,1]  ServeRequest[3]  1
-    Zrc[3,1]  VideoMustBeInCache[3,1]  1
-    Zrc[3,1]  Pr[3]     700
-    Zrc[3,2]  ServeRequest[3]  1
-    Zrc[3,2]  VideoMustBeInCache[3,2]  1
-    Zrc[3,2]  Pr[3]     800
     Ur[0]     ServeRequest[0]  1
     Ur[0]     Pr[0]     1000
     Ur[1]     ServeRequest[1]  1
@@ -126,6 +96,38 @@ COLUMNS
     Pr[2]     Pr[2]     1
     Pr[3]     OBJ       1000
     Pr[3]     Pr[3]     1
+    MARKER    'MARKER'                 'INTORG'
+    Zrc[0,0]  ServeRequest[0]  1
+    Zrc[0,0]  VideoMustBeInCache[0,0]  1
+    Zrc[0,0]  Pr[0]     100
+    Zrc[0,1]  ServeRequest[0]  1
+    Zrc[0,1]  VideoMustBeInCache[0,1]  1
+    Zrc[0,1]  Pr[0]     300
+    Zrc[0,2]  ServeRequest[0]  1
+    Zrc[0,2]  VideoMustBeInCache[0,2]  1
+    Zrc[0,2]  Pr[0]     200
+    Zrc[1,0]  OBJ       0
+    Zrc[1,1]  OBJ       0
+    Zrc[1,2]  OBJ       0
+    Zrc[2,0]  ServeRequest[2]  1
+    Zrc[2,0]  VideoMustBeInCache[2,0]  1
+    Zrc[2,0]  Pr[2]     100
+    Zrc[2,1]  ServeRequest[2]  1
+    Zrc[2,1]  VideoMustBeInCache[2,1]  1
+    Zrc[2,1]  Pr[2]     300
+    Zrc[2,2]  ServeRequest[2]  1
+    Zrc[2,2]  VideoMustBeInCache[2,2]  1
+    Zrc[2,2]  Pr[2]     200
+    Zrc[3,0]  ServeRequest[3]  1
+    Zrc[3,0]  VideoMustBeInCache[3,0]  1
+    Zrc[3,0]  Pr[3]     100
+    Zrc[3,1]  ServeRequest[3]  1
+    Zrc[3,1]  VideoMustBeInCache[3,1]  1
+    Zrc[3,1]  Pr[3]     300
+    Zrc[3,2]  ServeRequest[3]  1
+    Zrc[3,2]  VideoMustBeInCache[3,2]  1
+    Zrc[3,2]  Pr[3]     200
+    MARKER    'MARKER'                 'INTEND'
 RHS
     RHS1      Capacity[0]  100
     RHS1      Capacity[1]  100
@@ -163,6 +165,10 @@ BOUNDS
  BV BND1      Yij[4,0]
  BV BND1      Yij[4,1]
  BV BND1      Yij[4,2]
+ BV BND1      Ur[0]   
+ BV BND1      Ur[1]   
+ BV BND1      Ur[2]   
+ BV BND1      Ur[3]   
  BV BND1      Zrc[0,0]
  BV BND1      Zrc[0,1]
  BV BND1      Zrc[0,2]
@@ -175,8 +181,4 @@ BOUNDS
  BV BND1      Zrc[3,0]
  BV BND1      Zrc[3,1]
  BV BND1      Zrc[3,2]
- BV BND1      Ur[0]   
- BV BND1      Ur[1]   
- BV BND1      Ur[2]   
- BV BND1      Ur[3]   
 ENDATA
