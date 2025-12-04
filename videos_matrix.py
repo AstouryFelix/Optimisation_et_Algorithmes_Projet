@@ -31,7 +31,7 @@ Re   = []                       # The ID of the endpoint from which the requests
 Rn   = []                       # The number of requests                                                                 (0 < Rn ≤ 10000)                   #
                                                                                                                                                             #
 epsilon_to_compare_gap = 5e-3   # Ecart minimal avant l'arrêt de la fonction optimise.                                                                      #
-max_time = 120000                                                                                                                                           #
+max_time = 1200                                                                                                                                             #
 # ========================================================================================================================================================= #
 
 # ======================================================================= Fonctions ======================================================================= #
@@ -78,7 +78,7 @@ def get_data(path : str) :                                                      
                                                                                                                                                             #
     return V, E, R, C, X, S, Ld, K, C_id, Lc, Rv, Re, Rn                                                                                                    #
                                                                                                                                                             #
-def write_solution(model : gp.Model, Y, request_video_cache, C, path : str = "video.out") :                                                                 #
+def write_solution(model : gp.Model, C, V, Y, path : str = "video.out") :                                                                                   #
                                                                                                                                                             #
         # ==================== Etat du model ==================== #                                                                                         #
         if model.status == GRB.OPTIMAL:                                                                                                                     #
@@ -98,11 +98,11 @@ def write_solution(model : gp.Model, Y, request_video_cache, C, path : str = "vi
             return                                                                                                                                          #
                                                                                                                                                             #
         # ==================== Ecriture des resultats ==================== #                                                                                #
-        result = [[c] for c in range(C)]                                                                                                                    #
-        for (v, c) in request_video_cache:                                                                                                                  #
-            if Y[v, c].x == 1 :                                                                                                                             #
-                result[c].append(v)                                                                                                                         #
-                                                                                                                                                            #
+        result =  [[c] for c in range(C)]                                                                                                                   #
+        for c in range(C) :                                                                                                                                 #
+            for v in range(V):                                                                                                                              #
+                if Y[v, c].x == 1:                                                                                                                          #
+                    result[c].append(v)                                                                                                                     #
                                                                                                                                                             #
         gen = [x for x in result if len(x) > 1]                                                                                                             #
         with open(path, "w") as f:                                                                                                                          #
@@ -114,88 +114,87 @@ def write_solution(model : gp.Model, Y, request_video_cache, C, path : str = "vi
 # ========================================================================================================================================================= #
 
 # ===================================================================== Build model ======================================================================= #
-def main(path : str = "videos/datasets/example.in") :                                                                                                       #
-    with gp.Env() as env, gp.Model(env=env) as m:                                                                                                           #
+def main(path : str = "videos/datasets/example.in") : 
+    with gp.Env() as env, gp.Model(env=env) as m:
+
+        # TODO : Accélerer la création des contraintes -> Passer sous forme matricielle ?
+        # TODO : Essayer de trouver une autre modélisation plus simple -> plus efficace
+
+        # ==================== Données ==================== #
+        m.setParam('MIPGap', epsilon_to_compare_gap) # Permet le remplacement du callback
+        m.setParam('OutputFlag', 1)
+        m.setParam('TimeLimit', 1)
+        V, E, R, C, X, S, Ld, K, C_id, Lc, Rv, Re, Rn = get_data(path)
+        
+        # ==================== addVars ==================== #
+        Y  = m.addVars(V, C, vtype = GRB.BINARY, name="Yij") # 1 si vidéo v est mise dans le CacheServeur C, 0 sinon
+        U  = m.addVars(R,    vtype = GRB.BINARY, name="Ur" ) # 1 si la requête R est desservie par le data center, 0 sinon
+        P  = m.addVars(R                       , name="Pr" ) # Gain de latence pour chaque requete
+        Z  = m.addVars(R, C, vtype = GRB.BINARY, name="Zrc") # 1 si la requête R est desservie par le cache C, 0 sinon
+        # TODO : Enlever cette variable et utiliser le dict à la place ? Optim -> Essayer matrice avant
+        # Z = {} 
+        # for r in range(R):
+        #     e = Re[r]
+        #     for c in C_id[e]:
+        #         Z[r, c] = m.addVar(vtype=GRB.BINARY, name=f"Z_{r}_{c}")
+
+        # ==================== setObjective ==================== #
+        m.setObjective(
+            gp.quicksum(P[r] * Rn[r] for r in range(R)),
+            GRB.MAXIMIZE
+        )
+
+        m.addConstrs(
+            (gp.quicksum(Y[i, j] * S[i] for i in range(V)) <= X for j in range(C)), 
+            name="Capacity"
+        )
+
+        m.addConstrs(
+            (gp.quicksum(Z[r, c] for c in C_id[Re[r]]) + U[r] == 1 for r in range(R)),
+            name="ServeRequest"
+        )
+
+        m.addConstrs(
+            (Z[r, c] <= Y[Rv[r], c] for r in range(R) for c in C_id[Re[r]]),
+            name="VideoMustBeInCache"
+        )
+
+        m.addConstrs(
+            (P[r] == Ld[Re[r]]- (Ld[Re[r]] * U[r] + gp.quicksum(Lc[Re[r]][C_id[Re[r]].index(c)] * Z[r, c]for c in C_id[Re[r]]))for r in range(R)),
+            name="Pr"
+        )
+
+        # TODO : Besoin de alpha et beta ? Trouver une autre méthode.
+        alpha = {}
+        for e in range(E):
+            alpha[e] = {}
+            for c in range(C):
+                alpha[e][c] = 1 if c in C_id[e] else 0
+
+        beta = {}
+        for e in range(E):
+            beta[e] = {v: 0 for v in range(V)}
+
+        for r in range(R):
+            video = Rv[r]
+            endpoint = Re[r]
+            beta[endpoint][video] = 1  
+
+        valid_video_cache = {}
+        for v in range(V):
+            for c in range(C):
+                valid_video_cache[(v, c)] = sum(alpha[e][c] * beta[e][v] for e in range(E))
+
+        m.addConstrs(
+            (Y[v, c] <= valid_video_cache[(v, c)] for v in range(V) for c in range(C)),
+            name="ValidVideoCache"
+        )
+
+        # ==================== Lancement du moteur VROUMVROUM ==================== #
+        m.write("videos.mps")
+        m.optimize()
                                                                                                                                                             #
-        # TODO : Accélerer la création des contraintes -> Passer sous forme matricielle ?                                                                   #
-        # TODO : Essayer de trouver une autre modélisation plus simple -> plus efficace                                                                     #
-                                                                                                                                                            #
-        # ==================== Données ==================== #                                                                                               #
-        m.setParam('MIPGap', epsilon_to_compare_gap) # Permet le remplacement du callback                                                                   #
-        m.setParam('OutputFlag', 1)                                                                                                                         #
-        m.setParam('TimeLimit', 1)                                                                                                                          #
-                                                                                                                                                            #
-        # Conseil Gurobot                                                                                                                                   #
-        m.setParam('Presolve', 2)      # Aggressive presolve                                                                                                #
-        m.setParam('Cuts', 2)          # Aggressive cuts                                                                                                    #
-        m.setParam('Heuristics', 0.2)  # Spend 20% time on heuristics                                                                                       #
-        m.setParam('MIPFocus', 1)      # Focus on finding good solutions quickly                                                                            #
-        m.setParam('MIPGap', 0.1)      # 10% gap for first pass                                                                                             #
-                                                                                                                                                            #
-        V, E, R, C, X, S, Ld, K, C_id, Lc, Rv, Re, Rn = get_data(path)                                                                                      #
-                                                                                                                                                            #
-        # ==================== addVars ==================== #                                                                                               #
-                                                                                                                                                            #
-        #Permet de ne pas utiliser de la mémoire sur combinaisons vides                                                                                     #
-        cache_latency = {}                                                                                                                                  #
-        for e in range(E):                                                                                                                                  #
-            for i, c in enumerate(C_id[e]):                                                                                                                 #
-                cache_latency[e, c] = Lc[e][i]                                                                                                              #
-                                                                                                                                                            #
-        request_video_cache = set()                                                                                                                         #
-        for r in range(R):                                                                                                                                  #
-            video = Rv[r]                                                                                                                                   #
-            endpoint = Re[r]                                                                                                                                #
-            for c in C_id[endpoint]:                                                                                                                        #
-                request_video_cache.add((video, c))                                                                                                         #
-                                                                                                                                                            #
-        request_cache_pair = [                                                                                                                              #
-            (r, c) for r in range(R) for c in C_id[Re[r]]                                                                                                   #
-        ]                                                                                                                                                   #
-                                                                                                                                                            #
-        Y  = m.addVars(request_video_cache, vtype = GRB.BINARY, name="Yij") # 1 si vidéo v est mise dans le CacheServeur C, 0 sinon                         # 
-        U  = m.addVars(R,    vtype = GRB.BINARY, name="Ur" ) # 1 si la requête R est desservie par le data center, 0 sinon                                  #
-        P  = m.addVars(R,                        name="Pr" ) # Gain de latence pour chaque requete                                                          #
-        Z  = m.addVars(request_cache_pair, vtype = GRB.BINARY, name="Zrc") # 1 si la requête R est desservie par le cache C, 0 sinon                        #     
-        # TODO : Enlever cette variable et utiliser le dict à la place ? Optim -> Essayer matrice avant -> Fait autrement et matrix pas rentable            #
-        # Z = {}                                                                                                                                            #
-        # for r in range(R):                                                                                                                                #
-        #     e = Re[r]                                                                                                                                     #
-        #     for c in C_id[e]:                                                                                                                             #
-        #         Z[r, c] = m.addVar(vtype=GRB.BINARY, name=f"Z_{r}_{c}")                                                                                   #
-                                                                                                                                                            #
-        # ==================== setObjective ==================== #                                                                                          #
-        m.setObjective(                                                                                                                                     #
-            gp.quicksum(P[r] * Rn[r] for r in range(R)),                                                                                                    #
-            GRB.MAXIMIZE                                                                                                                                    #
-        )                                                                                                                                                   #
-                                                                                                                                                            #
-        m.addConstrs(                                                                                                                                       #
-            (gp.quicksum(Y[v, c] * S[v] for v, cache in request_video_cache if cache == c) <= X for c in range(C)),                                         #
-            name="Capacity"                                                                                                                                 #
-        )                                                                                                                                                   #
-                                                                                                                                                            #
-        m.addConstrs(                                                                                                                                       #
-            (gp.quicksum(Z[r, c] for c in C_id[Re[r]]) + U[r] == 1 for r in range(R)),                                                                      #
-            name="ServeRequest"                                                                                                                             #
-        )                                                                                                                                                   #
-                                                                                                                                                            #
-        m.addConstrs(                                                                                                                                       #
-            (Z[r, c] <= Y[Rv[r], c] for r, c in request_cache_pair),                                                                                        #
-            name="VideoMustBeInCache"                                                                                                                       #
-        )                                                                                                                                                   #
-                                                                                                                                                            #
-        m.addConstrs(                                                                                                                                       #
-            (P[r] == Ld[Re[r]]- (Ld[Re[r]] * U[r] + gp.quicksum(Lc[Re[r]][C_id[Re[r]].index(c)] * Z[r, c]for c in C_id[Re[r]]))for r in range(R)),          #
-            name="Pr"                                                                                                                                       #
-        )                                                                                                                                                   #
-                                                                                                                                                            #                                                                                                          
-# ==================== Lancement du moteur VROUMVROUM ==================== #                                                                                #
-        m.write("videos.mps")                                                                                                                               #
-        m.optimize()                                                                                                                                        #
-                                                                                                                                                            #
-        write_solution(m, Y, request_video_cache, C, "videos.out")                                                                                          #                  
-        m.write("videos.lp")                                                                                                                                #
+        write_solution(m, C, V, Y, "videos.out")                                                                                                             #
 # ========================================================================================================================================================= #
 
 # ======================================================================== main =========================================================================== #
