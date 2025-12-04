@@ -1,4 +1,5 @@
 import sys
+import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
 
@@ -31,7 +32,7 @@ Re   = []                       # The ID of the endpoint from which the requests
 Rn   = []                       # The number of requests                                                                 (0 < Rn ≤ 10000)                   #
                                                                                                                                                             #
 epsilon_to_compare_gap = 5e-3   # Ecart minimal avant l'arrêt de la fonction optimise.                                                                      #
-max_time = 1200                                                                                                                                             #
+max_time = 12000                                                                                                                                             #
 # ========================================================================================================================================================= #
 
 # ======================================================================= Fonctions ======================================================================= #
@@ -76,7 +77,20 @@ def get_data(path : str) :                                                      
             Re.append(line[1])                                                                                                                              #
             Rn.append(line[2])                                                                                                                              #
                                                                                                                                                             #
-    return V, E, R, C, X, S, Ld, K, C_id, Lc, Rv, Re, Rn                                                                                                    #
+    return (V,
+            E,
+            R,
+            C,
+            X,
+            np.array(S),
+            np.array(Ld),
+            np.array(K),
+            C_id,
+            Lc,
+            np.array(Rv),
+            np.array(Re),
+            np.array(Rn)
+            )                                                                                                   #
                                                                                                                                                             #
 def write_solution(model : gp.Model, C, V, Y, path : str = "video.out") :                                                                                   #
                                                                                                                                                             #
@@ -127,10 +141,11 @@ def main(path : str = "videos/datasets/example.in") :
         V, E, R, C, X, S, Ld, K, C_id, Lc, Rv, Re, Rn = get_data(path)
         
         # ==================== addVars ==================== #
-        Y  = m.addVars(V, C, vtype = GRB.BINARY, name="Yij") # 1 si vidéo v est mise dans le CacheServeur C, 0 sinon
-        U  = m.addVars(R,    vtype = GRB.BINARY, name="Ur" ) # 1 si la requête R est desservie par le data center, 0 sinon
-        P  = m.addVars(R                       , name="Pr" ) # Gain de latence pour chaque requete
-        Z  = m.addVars(R, C, vtype = GRB.BINARY, name="Zrc") # 1 si la requête R est desservie par le cache C, 0 sinon
+        
+        Y  = m.addMVar((V, C), vtype = GRB.BINARY, name="Yij") # 1 si vidéo v est mise dans le CacheServeur C, 0 sinon
+        U  = m.addMVar(R,      vtype = GRB.BINARY, name="Ur" ) # 1 si la requête R est desservie par le data center, 0 sinon
+        P  = m.addMVar(R,                          name="Pr" ) # Gain de latence pour chaque requete
+        Z  = m.addMVar((R, C), vtype = GRB.BINARY, name="Zrc") # 1 si la requête R est desservie par le cache C, 0 sinon
         # TODO : Enlever cette variable et utiliser le dict à la place ? Optim -> Essayer matrice avant
         # Z = {} 
         # for r in range(R):
@@ -140,12 +155,12 @@ def main(path : str = "videos/datasets/example.in") :
 
         # ==================== setObjective ==================== #
         m.setObjective(
-            gp.quicksum(P[r] * Rn[r] for r in range(R)),
+            P @ Rn,
             GRB.MAXIMIZE
         )
 
         m.addConstrs(
-            (gp.quicksum(Y[i, j] * S[i] for i in range(V)) <= X for j in range(C)), 
+            (Y[:, j] * S <= X for j in range(C)), 
             name="Capacity"
         )
 
