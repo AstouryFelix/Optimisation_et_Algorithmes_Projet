@@ -82,7 +82,7 @@ def write_solution(model : gp.Model, Y, request_video_cache, C, path : str = "vi
                                                                                                                                                             #
         # ==================== Etat du model ==================== #                                                                                         #
         if model.status == GRB.OPTIMAL:                                                                                                                     #
-            print(f"Solution optimale (à moins de {epsilon_to_compare_gap}% près) trouvée")                                                                 #
+            print(f"Solution optimale (à moins de {epsilon_to_compare_gap*100} % près) trouvée")                                                                 #
             print(f"Valeur objectif: {model.ObjVal}")                                                                                                       #
                                                                                                                                                             #
         elif model.status == GRB.TIME_LIMIT:                                                                                                                #
