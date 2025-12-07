@@ -1,6 +1,7 @@
 # Projet d'Optimisation et Algorithmes.  
 Le détail des attentes est dans "gurobipy_ Evaluation.pdf".  
 La problématique, ainsi que le détail du format d'entrée et de sortie, est dans "hashcode_2017_qualification_round.pdf".  
+Un rapport se trouve dans "Rapport_Projet.docx". Celui-ci explique la modélisation et présente des résultats comparatifs des différents modeles.  
 Afin de lancer le projet :
 - Avec la dernière version, lancant respectivement un exemple léger et une instance lourde :
     - python .\videos.py .\datasets\example.in

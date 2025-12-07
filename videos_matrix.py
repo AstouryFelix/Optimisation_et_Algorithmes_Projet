@@ -220,8 +220,8 @@ def main(path : str = "videos/datasets/example.in") :                           
 
 # ======================================================================== main =========================================================================== #
 if __name__ == "__main__":                                                                                                                                  #
-    # "datasets/trending_4000_10k.in"                                                                                                                       #
-    # "datasets/example.in"                                                                                                                                 #
+    # python .\videos_matrix.py .\datasets\trending_4000_10k.in                                                                                             #
+    # python .\videos_matrix.py .\datasets\example.in                                                                                                       #
     args = sys.argv[1]                                                                                                                                      #
     main(args)                                                                                                                                              #
 # ========================================================================================================================================================= #
