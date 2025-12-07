@@ -1,4 +1,4 @@
-import sys
+import sys, time
 import gurobipy as gp
 from gurobipy import GRB
 
@@ -31,7 +31,7 @@ Re   = []                       # The ID of the endpoint from which the requests
 Rn   = []                       # The number of requests                                                                 (0 < Rn ≤ 10000)                   #
                                                                                                                                                             #
 epsilon_to_compare_gap = 5e-3   # Ecart minimal avant l'arrêt de la fonction optimise.                                                                      #
-max_time = 120000                                                                                                                                           #
+max_time = GRB.INFINITY                                                                                                                                     #
 # ========================================================================================================================================================= #
 
 # ======================================================================= Fonctions ======================================================================= #
@@ -117,9 +117,7 @@ def write_solution(model : gp.Model, Y, request_video_cache, C, path : str = "vi
 def main(path : str = "videos/datasets/example.in") :                                                                                                       #
     with gp.Env() as env, gp.Model(env=env) as m:                                                                                                           #
                                                                                                                                                             #
-        # TODO : Accélerer la création des contraintes -> Passer sous forme matricielle ?                                                                   #
-        # TODO : Essayer de trouver une autre modélisation plus simple -> plus efficace                                                                     #
-                                                                                                                                                            #
+        start = time.time()                                                                                                                                 #
         # ==================== Données ==================== #                                                                                               #
         m.setParam('MIPGap', epsilon_to_compare_gap) # Permet le remplacement du callback                                                                   #
         m.setParam('OutputFlag', 1)                                                                                                                         #
@@ -154,21 +152,16 @@ def main(path : str = "videos/datasets/example.in") :                           
                                                                                                                                                             #
         Y  = m.addVars(request_video_cache, vtype = GRB.BINARY, name="Yij") # 1 si vidéo v est mise dans le CacheServeur C, 0 sinon                         # 
         U  = m.addVars(R,    vtype = GRB.BINARY, name="Ur" ) # 1 si la requête R est desservie par le data center, 0 sinon                                  #
-        P  = m.addVars(R,                        name="Pr" ) # Gain de latence pour chaque requete                                                          #
+        G  = m.addVars(R,                        name="Gr" ) # Gain de latence pour chaque requete                                                          #
         Z  = m.addVars(request_cache_pair, vtype = GRB.BINARY, name="Zrc") # 1 si la requête R est desservie par le cache C, 0 sinon                        #     
-        # TODO : Enlever cette variable et utiliser le dict à la place ? Optim -> Essayer matrice avant -> Fait autrement et matrix pas rentable            #
-        # Z = {}                                                                                                                                            #
-        # for r in range(R):                                                                                                                                #
-        #     e = Re[r]                                                                                                                                     #
-        #     for c in C_id[e]:                                                                                                                             #
-        #         Z[r, c] = m.addVar(vtype=GRB.BINARY, name=f"Z_{r}_{c}")                                                                                   #
                                                                                                                                                             #
         # ==================== setObjective ==================== #                                                                                          #
         m.setObjective(                                                                                                                                     #
-            gp.quicksum(P[r] * Rn[r] for r in range(R)),                                                                                                    #
+            gp.quicksum(G[r] * Rn[r] for r in range(R)),                                                                                                    #
             GRB.MAXIMIZE                                                                                                                                    #
         )                                                                                                                                                   #
                                                                                                                                                             #
+        # ==================== setConstraints ==================== #                                                                                        #
         m.addConstrs(                                                                                                                                       #
             (gp.quicksum(Y[v, c] * S[v] for v, cache in request_video_cache if cache == c) <= X for c in range(C)),                                         #
             name="Capacity"                                                                                                                                 #
@@ -185,15 +178,18 @@ def main(path : str = "videos/datasets/example.in") :                           
         )                                                                                                                                                   #
                                                                                                                                                             #
         m.addConstrs(                                                                                                                                       #
-            (P[r] == Ld[Re[r]]- (Ld[Re[r]] * U[r] + gp.quicksum(Lc[Re[r]][C_id[Re[r]].index(c)] * Z[r, c]for c in C_id[Re[r]]))for r in range(R)),          #
-            name="Pr"                                                                                                                                       #
+            (G[r] == Ld[Re[r]]- (Ld[Re[r]] * U[r] + gp.quicksum(Lc[Re[r]][C_id[Re[r]].index(c)] * Z[r, c]for c in C_id[Re[r]]))for r in range(R)),          #
+            name="Gr"                                                                                                                                       #
         )                                                                                                                                                   #
-                                                                                                                                                            #                                                                                                          
-# ==================== Lancement du moteur VROUMVROUM ==================== #                                                                                #
-        m.write("videos.mps")                                                                                                                               #
-        m.optimize()                                                                                                                                        #
                                                                                                                                                             #
-        write_solution(m, Y, request_video_cache, C, "videos.out")                                                                                          #                  
+# ==================== Lancement du moteur VROUMVROUM ==================== #                                                                                #
+        second = time.time()
+        print(f"==================================\n{second - start}\n==================================")                                            #
+        m.optimize()                                                                                                                                        #
+        print(f"==================================\n{time.time() - second}\n==================================")                                            #
+                                                                                                                                                            #
+        write_solution(m, Y, request_video_cache, C, "videos.out")                                                                                          #
+        m.write("videos.mps")                                                                                                                               #
         m.write("videos.lp")                                                                                                                                #
 # ========================================================================================================================================================= #
 
@@ -205,4 +201,4 @@ if __name__ == "__main__":                                                      
     main(args)                                                                                                                                              #
 # ========================================================================================================================================================= #
 
-# Fait main, avec l'aide occationnel du chatbot de Gurobi pour certaines contraintes, ainsi que pour le passage sous forme matricielle;
+# Fait main, avec l'aide occationnel du chatbot de Gurobi pour certaines contraintes, ainsi que pour le passage sous forme matricielle

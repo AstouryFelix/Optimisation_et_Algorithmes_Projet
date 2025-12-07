@@ -1,5 +1,4 @@
 import sys, time
-import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
 
@@ -77,20 +76,7 @@ def get_data(path : str) :                                                      
             Re.append(line[1])                                                                                                                              #
             Rn.append(line[2])                                                                                                                              #
                                                                                                                                                             #
-    return (V,                                                                                                                                              #
-            E,                                                                                                                                              #
-            R,                                                                                                                                              #
-            C,                                                                                                                                              #
-            X,                                                                                                                                              #
-            np.array(S),                                                                                                                                    #
-            np.array(Ld),                                                                                                                                   #
-            np.array(K),                                                                                                                                    #
-            C_id,                                                                                                                                           #
-            Lc,                                                                                                                                             #
-            np.array(Rv),                                                                                                                                   #
-            np.array(Re),                                                                                                                                   #
-            np.array(Rn)                                                                                                                                    #
-            )                                                                                                                                               #
+    return V, E, R, C, X, S, Ld, K, C_id, Lc, Rv, Re, Rn                                                                                                    #
                                                                                                                                                             #
 def write_solution(model : gp.Model, C, V, Y, path : str = "video.out") :                                                                                   #
                                                                                                                                                             #
@@ -130,40 +116,42 @@ def write_solution(model : gp.Model, C, V, Y, path : str = "video.out") :       
 # ===================================================================== Build model ======================================================================= #
 def main(path : str = "videos/datasets/example.in") :                                                                                                       #
     with gp.Env() as env, gp.Model(env=env) as m:                                                                                                           #
-                                                                                                                                                            #                                                                                                                                                            #
+                                                                                                                                                            #
+        # TODO : Accélerer la création des contraintes -> Passer sous forme matricielle ?                                                                   #
+        # TODO : Essayer de trouver une autre modélisation plus simple -> plus efficace                                                                     #
+        start = time.time()                                                                                                                                 #
+                                                                                                                                                            #
         # ==================== Données ==================== #                                                                                               #
-        m.setParam('MIPGap', epsilon_to_compare_gap) # Permet le remplacement du callback                                                                   #
+        m.setParam('MIPGap', epsilon_to_compare_gap)                                                                                                        #
         m.setParam('OutputFlag', 1)                                                                                                                         #
         m.setParam('TimeLimit', max_time)                                                                                                                   #
-                                                                                                                                                            #
-        # Conseil Gurobot                                                                                                                                   #
-        m.setParam('Presolve', 2)      # Aggressive presolve                                                                                                #
-        m.setParam('Cuts', 2)          # Aggressive cuts                                                                                                    #
-        m.setParam('Heuristics', 0.2)  # Spend 20% time on heuristics                                                                                       #
-        m.setParam('MIPFocus', 1)      # Focus on finding good solutions quickly                                                                            #
-        start = time.time()                                                                                                                                 #
         V, E, R, C, X, S, Ld, K, C_id, Lc, Rv, Re, Rn = get_data(path)                                                                                      #
                                                                                                                                                             #
         # ==================== addVars ==================== #                                                                                               #
-        Y  = m.addMVar((V, C), vtype = GRB.BINARY, name="Yij") # 1 si vidéo v est mise dans le CacheServeur C, 0 sinon                                      #
-        U  = m.addMVar(R,      vtype = GRB.BINARY, name="Ur" ) # 1 si la requête R est desservie par le data center, 0 sinon                                #
-        G  = m.addMVar(R,                          name="Gr" ) # Gain de latence pour chaque requete                                                        #
-        Z  = m.addMVar((R, C), vtype = GRB.BINARY, name="Zrc") # 1 si la requête R est desservie par le cache C, 0 sinon                                    #
+        Y  = m.addVars(V, C, vtype = GRB.BINARY, name="Yij")                                                                                                #
+        U  = m.addVars(R,    vtype = GRB.BINARY, name="Ur" )                                                                                                #
+        P  = m.addVars(R                       , name="Pr" )                                                                                                #
+        Z  = m.addVars(R, C, vtype = GRB.BINARY, name="Zrc")                                                                                                #
+        # TODO : Enlever cette variable et utiliser le dict à la place ?                                                                                    #
+        # Z = {}                                                                                                                                            #
+        # for r in range(R):                                                                                                                                #
+        #     e = Re[r]                                                                                                                                     #
+        #     for c in C_id[e]:                                                                                                                             #
+        #         Z[r, c] = m.addVar(vtype=GRB.BINARY, name=f"Z_{r}_{c}")                                                                                   #
                                                                                                                                                             #
-        # ==================== setObjective ==================== #                                                                                          #                                            
+        # ==================== setObjective ==================== #                                                                                          #
         m.setObjective(                                                                                                                                     #
-            G @ Rn,                                                                                                                                         #
+            gp.quicksum(P[r] * Rn[r] for r in range(R)),                                                                                                    #
             GRB.MAXIMIZE                                                                                                                                    #
         )                                                                                                                                                   #
                                                                                                                                                             #
         m.addConstrs(                                                                                                                                       #
-            (Y[:, j] * S <= X for j in range(C)),                                                                                                           #
+            (gp.quicksum(Y[i, j] * S[i] for i in range(V)) <= X for j in range(C)),                                                                         #
             name="Capacity"                                                                                                                                 #
         )                                                                                                                                                   #
                                                                                                                                                             #
         m.addConstrs(                                                                                                                                       #
-            (gp.quicksum(Z[r, c] for c in C_id[Re[r]]) + U[r]                                                                                               #
-            == 1 for r in range(R)),                                                                                                                        #
+            (gp.quicksum(Z[r, c] for c in C_id[Re[r]]) + U[r] == 1 for r in range(R)),                                                                      #
             name="ServeRequest"                                                                                                                             #
         )                                                                                                                                                   #
                                                                                                                                                             #
@@ -173,10 +161,10 @@ def main(path : str = "videos/datasets/example.in") :                           
         )                                                                                                                                                   #
                                                                                                                                                             #
         m.addConstrs(                                                                                                                                       #
-            (G[r] == Ld[Re[r]]- (Ld[Re[r]] * U[r] +                                                                                                         #
-            gp.quicksum(Lc[Re[r]][C_id[Re[r]].index(c)] * Z[r, c]                                                                                           #
+            (P[r] == Ld[Re[r]]- (Ld[Re[r]] * U[r]                                                                                                           #
+            + gp.quicksum(Lc[Re[r]][C_id[Re[r]].index(c)] * Z[r, c]                                                                                         #
             for c in C_id[Re[r]]))for r in range(R)),                                                                                                       #
-            name="Gr"                                                                                                                                       #
+            name="Pr"                                                                                                                                       #
         )                                                                                                                                                   #
                                                                                                                                                             #
         # TODO : Besoin de A et B ? Trouver une autre méthode.                                                                                              #
@@ -199,23 +187,26 @@ def main(path : str = "videos/datasets/example.in") :                           
         for v in range(V):                                                                                                                                  #
             for c in range(C):                                                                                                                              #
                 valid_video_cache[(v, c)] = sum(A[e][c] * B[e][v]                                                                                           #
-                    for e in range(E))                                                                                                                      #
+                                                for e in range(E))                                                                                          #
                                                                                                                                                             #
         m.addConstrs(                                                                                                                                       #
-            (Y[v, c] <= valid_video_cache[(v, c)]                                                                                                           #
-             for v in range(V) for c in range(C)),                                                                                                          #
+            (Y[v, c] <= valid_video_cache[(v, c)] for v in range(V)                                                                                         #
+             for c in range(C)),                                                                                                                            #
             name="ValidVideoCache"                                                                                                                          #
         )                                                                                                                                                   #
-                                                                                                                                                            #                                            
-        # ==================== Lancement du moteur VROUMVROUM ==================== #                                                                        #                                            
                                                                                                                                                             #
+        # ==================== Lancement du moteur VROUMVROUM ==================== #                                                                        #
+        m.write("videos.mps")                                                                                                                               #
+        m.write("videos.lp")                                                                                                                                #
         second = time.time()                                                                                                                                #
         print(f"==================================\n{second - start}\n==================================")                                                  #
                                                                                                                                                             #
-        m.optimize()                                                                                                                                        #                                            
-        m.write("videos.mps")                                                                                                                               #                                            
+        m.optimize()                                                                                                                                        #                                         
+                                                                                                                                                            #                                         
         write_solution(m, C, V, Y, "videos.out")                                                                                                            #
-        print(f"==================================\n{time.time() - second}\n==================================")                                            #
+        print(f"==================================\n{time.time() - second}\n==================================")                                            #   
+                                                                                                                                                            #
+        write_solution(m, C, V, Y, "videos.out")                                                                                                            #
 # ========================================================================================================================================================= #
 
 # ======================================================================== main =========================================================================== #
