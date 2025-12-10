@@ -82,7 +82,7 @@ def write_solution(model : gp.Model, Y, request_video_cache, C, path : str = "vi
                                                                                                                                                             #
         # ==================== Etat du model ==================== #                                                                                         #
         if model.status == GRB.OPTIMAL:                                                                                                                     #
-            print(f"Solution optimale (à moins de {epsilon_to_compare_gap*100} % près) trouvée")                                                                 #
+            print(f"Solution optimale (à moins de {epsilon_to_compare_gap*100} % près) trouvée")                                                            #
             print(f"Valeur objectif: {model.ObjVal}")                                                                                                       #
                                                                                                                                                             #
         elif model.status == GRB.TIME_LIMIT:                                                                                                                #
@@ -118,7 +118,7 @@ def main(path : str = "videos/datasets/example.in") :                           
     with gp.Env() as env, gp.Model(env=env) as m:                                                                                                           #
                                                                                                                                                             #
         start = time.time()                                                                                                                                 #
-        print("# ==================== Lecture des Données ==================== #")                                                                                      #
+        print("# ==================== Lecture des Données ==================== #")                                                                          #
         m.setParam('MIPGap', epsilon_to_compare_gap) # Permet le remplacement du callback                                                                   #
         m.setParam('OutputFlag', 1)                                                                                                                         #
         m.setParam('TimeLimit', max_time)                                                                                                                   #
@@ -150,14 +150,17 @@ def main(path : str = "videos/datasets/example.in") :                           
             (r, c) for r in range(R) for c in C_id[Re[r]]                                                                                                   #
         ]                                                                                                                                                   #
                                                                                                                                                             #
-        Y  = m.addVars(request_video_cache, vtype = GRB.BINARY, name="Yij") # 1 si vidéo v est mise dans le CacheServeur C, 0 sinon                         # 
-        U  = m.addVars(R,    vtype = GRB.BINARY, name="Ur" ) # 1 si la requête R est desservie par le data center, 0 sinon                                  #
-        G  = m.addVars(R,                        name="Gr" ) # Gain de latence pour chaque requete                                                          #
-        Z  = m.addVars(request_cache_pair, vtype = GRB.BINARY, name="Zrc") # 1 si la requête R est desservie par le cache C, 0 sinon                        #     
+        Y  = m.addVars(request_video_cache, vtype = GRB.BINARY, name="Yij") # 1 si vidéo v est mise dans le CacheServeur C, 0 sinon                         #
+        U  = m.addVars(R,                   vtype = GRB.BINARY, name="Ur" ) # 1 si la requête R est desservie par le data center, 0 sinon                   #
+        Z  = m.addVars(request_cache_pair,  vtype = GRB.BINARY, name="Zrc") # 1 si la requête R est desservie par le cache C, 0 sinon                       #
+        G  = m.addVars(R                                      , name="Gr" ) # Gain de latence pour chaque requete                                           #
                                                                                                                                                             #
         print("# ==================== setObjective ==================== #")                                                                                 #
+        total_requests = sum(Rn)                                                                                                                            #
+        scaling_factor = 1000.0 / total_requests                                                                                                            #
+                                                                                                                                                            #
         m.setObjective(                                                                                                                                     #
-            gp.quicksum(G[r] * Rn[r] for r in range(R)),                                                                                                    #
+            gp.quicksum(G[r] * Rn[r] for r in range(R)) * scaling_factor,                                                                                   #
             GRB.MAXIMIZE                                                                                                                                    #
         )                                                                                                                                                   #
                                                                                                                                                             #
@@ -202,4 +205,6 @@ if __name__ == "__main__":                                                      
     main(args)                                                                                                                                              #
 # ========================================================================================================================================================= #
 
-# Fait main, avec l'aide occationnel du chatbot de Gurobi pour certaines contraintes, ainsi que pour le passage sous forme matricielle
+# ========================================================================================================================================================= #
+#                           Fait main, avec l'aide occasionnelle du chatbot de Gurobi, notament pour le passage sous forme matricielle                      #
+# ========================================================================================================================================================= #

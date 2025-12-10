@@ -130,7 +130,7 @@ def write_solution(model : gp.Model, C, V, Y, path : str = "video.out") :       
 # ===================================================================== Build model ======================================================================= #
 def main(path : str = "videos/datasets/example.in") :                                                                                                       #
     with gp.Env() as env, gp.Model(env=env) as m:                                                                                                           #
-                                                                                                                                                            #                                                                                                                                                            #
+                                                                                                                                                            #
         # ==================== Données ==================== #                                                                                               #
         m.setParam('MIPGap', epsilon_to_compare_gap) # Permet le remplacement du callback                                                                   #
         m.setParam('OutputFlag', 1)                                                                                                                         #
@@ -150,9 +150,12 @@ def main(path : str = "videos/datasets/example.in") :                           
         G  = m.addMVar(R,                          name="Gr" ) # Gain de latence pour chaque requete                                                        #
         Z  = m.addMVar((R, C), vtype = GRB.BINARY, name="Zrc") # 1 si la requête R est desservie par le cache C, 0 sinon                                    #
                                                                                                                                                             #
-        # ==================== setObjective ==================== #                                                                                          #                                            
+        # ==================== setObjective ==================== #                                                                                          #
+        total_requests = sum(Rn)                                                                                                                            #
+        scaling_factor = 1000.0 / total_requests                                                                                                            #
+                                                                                                                                                            #
         m.setObjective(                                                                                                                                     #
-            G @ Rn,                                                                                                                                         #
+            G @ Rn * scaling_factor,                                                                                                                        #
             GRB.MAXIMIZE                                                                                                                                    #
         )                                                                                                                                                   #
                                                                                                                                                             #
@@ -206,14 +209,14 @@ def main(path : str = "videos/datasets/example.in") :                           
              for v in range(V) for c in range(C)),                                                                                                          #
             name="ValidVideoCache"                                                                                                                          #
         )                                                                                                                                                   #
-                                                                                                                                                            #                                            
-        # ==================== Lancement du moteur VROUMVROUM ==================== #                                                                        #                                            
+                                                                                                                                                            #
+        # ==================== Lancement du moteur VROUMVROUM ==================== #                                                                        #
                                                                                                                                                             #
         second = time.time()                                                                                                                                #
         print(f"==================================\n{second - start}\n==================================")                                                  #
                                                                                                                                                             #
-        m.optimize()                                                                                                                                        #                                            
-        m.write("videos.mps")                                                                                                                               #                                            
+        m.optimize()                                                                                                                                        #
+        m.write("videos.mps")                                                                                                                               #
         write_solution(m, C, V, Y, "videos.out")                                                                                                            #
         print(f"==================================\n{time.time() - second}\n==================================")                                            #
 # ========================================================================================================================================================= #
@@ -226,4 +229,4 @@ if __name__ == "__main__":                                                      
     main(args)                                                                                                                                              #
 # ========================================================================================================================================================= #
 
-# Fait main, avec l'aide occationnel du chatbot de Gurobi pour certaines contraintes, ainsi que pour le passage sous forme matricielle;
+# Fait main, avec l'aide occasionnelle du chatbot de Gurobi pour certaines contraintes, ainsi que pour le passage sous forme matricielle;
