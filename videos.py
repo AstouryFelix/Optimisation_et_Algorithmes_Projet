@@ -118,7 +118,7 @@ def main(path : str = "videos/datasets/example.in") :                           
     with gp.Env() as env, gp.Model(env=env) as m:                                                                                                           #
                                                                                                                                                             #
         start = time.time()                                                                                                                                 #
-        print("# ==================== Lecture des Données ==================== #")                                                                          #
+        print("# ========================================================= Lecture des Données ========================================================= #")#
         m.setParam('MIPGap', epsilon_to_compare_gap) # Permet le remplacement du callback                                                                   #
         m.setParam('OutputFlag', 1)                                                                                                                         #
         m.setParam('TimeLimit', max_time)                                                                                                                   #
@@ -131,7 +131,7 @@ def main(path : str = "videos/datasets/example.in") :                           
                                                                                                                                                             #
         V, E, R, C, X, S, Ld, K, C_id, Lc, Rv, Re, Rn = get_data(path)                                                                                      #
                                                                                                                                                             #
-        print("# ==================== addVars ==================== #")                                                                                      #
+        print("# =============================================================== addVars =============================================================== #")#
                                                                                                                                                             #
         #Permet de ne pas utiliser de la mémoire sur combinaisons vides                                                                                     #
         cache_latency = {}                                                                                                                                  #
@@ -155,7 +155,7 @@ def main(path : str = "videos/datasets/example.in") :                           
         Z  = m.addVars(request_cache_pair,  vtype = GRB.BINARY, name="Zrc") # 1 si la requête R est desservie par le cache C, 0 sinon                       #
         G  = m.addVars(R                                      , name="Gr" ) # Gain de latence pour chaque requete                                           #
                                                                                                                                                             #
-        print("# ==================== setObjective ==================== #")                                                                                 #
+        print("# ============================================================ setObjective ============================================================= #")#
         total_requests = sum(Rn)                                                                                                                            #
         scaling_factor = 1000.0 / total_requests                                                                                                            #
                                                                                                                                                             #
@@ -164,7 +164,7 @@ def main(path : str = "videos/datasets/example.in") :                           
             GRB.MAXIMIZE                                                                                                                                    #
         )                                                                                                                                                   #
                                                                                                                                                             #
-        print("# ==================== setConstraints ==================== #")                                                                               #
+        print("# ============================================================ setConstraints =========================================================== #")#
         m.addConstrs(                                                                                                                                       #
             (gp.quicksum(Y[v, c] * S[v] for v, cache in request_video_cache if cache == c) <= X for c in range(C)),                                         #
             name="Capacity"                                                                                                                                 #
@@ -186,12 +186,12 @@ def main(path : str = "videos/datasets/example.in") :                           
         )                                                                                                                                                   #
                                                                                                                                                             #
         second = time.time()                                                                                                                                #
-        print(f"# ==================== temps de création des contraintes : {second - start} ==================== #")                                        #
+        print(f"# ---------------------------------------- temps de création des contraintes : {second - start} ---------------------------------------- #")#
                                                                                                                                                             #
-        print("# ==================== Lancement du moteur VROUMVROUM ==================== #")                                                               #
+        print("# ==================================================== Lancement du moteur VROUMVROUM =================================================== #")#
         m.optimize()                                                                                                                                        #
                                                                                                                                                             #
-        print(f"# ==================== temps pour trouver un résultat suffisant : {time.time() - second} ==================== #")                           #
+        print(f"# ---------------------------------- temps pour trouver un résultat suffisant : {time.time() - second} --------------------------------- #")#
         write_solution(m, Y, request_video_cache, C, "videos.out")                                                                                          #
         m.write("videos.mps")                                                                                                                               #
         m.write("videos.lp")                                                                                                                                #
